@@ -1,0 +1,5 @@
+config.json
+mail_archive/
+__pycache__/
+*.pyc
+.venv/

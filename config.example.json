@@ -1,0 +1,8 @@
+{
+  "email": "your.name@example.com",
+  "password": "your-client-password",
+  "imap_host": "imap.exmail.qq.com",
+  "imap_port": 993,
+  "mailboxes": ["INBOX"],
+  "output_dir": "mail_archive/raw"
+}
