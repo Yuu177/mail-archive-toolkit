@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Archive Tencent Exmail messages from IMAP as raw .eml files."""
+"""Archive IMAP messages as raw .eml files."""
 
 from __future__ import annotations
 
@@ -209,7 +209,7 @@ def sync(config: Config, limit: Optional[int]) -> SyncStats:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Download Tencent Exmail IMAP messages as .eml files."
+        description="Download IMAP messages as .eml files."
     )
     parser.add_argument(
         "--config",
