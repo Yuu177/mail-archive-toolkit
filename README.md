@@ -44,6 +44,8 @@
 
 ## 安装依赖
 
+**当前依赖版本只在 Python 3.8 环境下测试过**
+
 ```bash
 pip install -r requirements.txt
 ```
