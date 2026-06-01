@@ -1,7 +1,6 @@
 # IMAP 邮件 EML 归档工具
 
-这个工具通过 IMAP 拉取邮箱邮件，把每封邮件保存成原始 `.eml` 文件，
-然后可以继续转换成 `.html` 和方便搜索的 `.txt` 文件。
+这个工具通过 IMAP 拉取邮箱邮件，把每封邮件保存成原始 `.eml` 文件，然后可以继续转换成 `.html` 和方便搜索的 `.txt` 文件。
 
 只要邮箱服务支持 IMAP，配置正确的服务器、端口、账号和客户端密码后就可以使用。下面的默认配置使用腾讯企业邮箱作为示例。
 
@@ -35,7 +34,7 @@
 2. 在 `开启服务` 里开启 `IMAP/SMTP服务`。
 3. 在 `收取选项` 里勾选 `收取“我的文件夹”`，收取范围选择 `全部邮件`。
 
-`mailboxes` 填 IMAP 邮箱文件夹名。脚本启动时会打印所有文件夹、邮件数量和对应的本地目录名。
+`mailboxes` 填 IMAP 邮箱文件夹名。脚本启动时会打印所有文件夹和邮件数量。
 
 示例：
 
@@ -46,7 +45,7 @@
 ## 安装依赖
 
 ```bash
-python3 -m pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
 ## 拉取 EML
@@ -66,16 +65,17 @@ python3 sync_eml.py --limit 20
 输出目录：
 
 ```text
-mail_archive/raw/<邮箱文件夹名__短hash>/
+mail_archive/raw/<邮箱文件夹名>/
 ```
 
 例如：
 
 ```text
-mail_archive/raw/INBOX__dc063b45c9/
+mail_archive/raw/INBOX/
+mail_archive/raw/其他文件夹/gitlab/
 ```
 
-目录名后面的短 hash 用来避免不同 IMAP 文件夹映射到同一个本地目录，例如 `A/B` 和 `A_B`。
+本地路径会保留邮箱文件夹名中的 `/` 层级。为了避免写到归档目录之外，文件夹名不能是绝对路径，路径段也不能是空、`.` 或 `..`。
 
 重复运行时，已经存在的 `UID.eml` 文件会跳过。
 
@@ -90,10 +90,17 @@ python3 eml_to_html.py --input mail_archive/raw --output mail_archive/html
 输出目录：
 
 ```text
-mail_archive/html/<邮箱文件夹名__短hash>/
+mail_archive/html/<邮箱文件夹名>/
 ```
 
-脚本会读取 input 目录下所有邮箱子目录。
+例如：
+
+```text
+mail_archive/html/INBOX/
+mail_archive/html/其他文件夹/gitlab/
+```
+
+脚本会递归读取 input 目录下所有邮箱子目录，并保留相对目录结构。
 
 ## 转换成 TXT
 
@@ -106,7 +113,14 @@ python3 html_to_text.py --input mail_archive/html --output mail_archive/text
 输出目录：
 
 ```text
-mail_archive/text/<邮箱文件夹名__短hash>/
+mail_archive/text/<邮箱文件夹名>/
+```
+
+例如：
+
+```text
+mail_archive/text/INBOX/
+mail_archive/text/其他文件夹/gitlab/
 ```
 
 搜索文本：

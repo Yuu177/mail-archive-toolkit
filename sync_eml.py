@@ -15,7 +15,7 @@ from imapclient.exceptions import IMAPClientError
 from imapclient import imap_utf7
 from tqdm import tqdm
 
-from archive_utils import mailbox_dir_name
+from archive_utils import mailbox_relative_path
 
 
 DEFAULT_CONFIG = Path("config.json")
@@ -118,9 +118,9 @@ def print_mailbox_summary(client: IMAPClient) -> None:
         try:
             folder_status = client.select_folder(name, readonly=True)
             message_count = int(folder_status.get(b"EXISTS", 0))
-            print(f"  {name}: {message_count} -> {mailbox_dir_name(name)}")
+            print(f"  {name}: {message_count}")
         except Exception as exc:
-            print(f"  {name}: unavailable ({exc}) -> {mailbox_dir_name(name)}")
+            print(f"  {name}: unavailable ({exc})")
 
 
 def list_target_uids(client: IMAPClient, mailbox: str, limit: Optional[int]) -> list[int]:
@@ -159,13 +159,14 @@ def sync_mailbox(
     mailbox: str,
     limit: Optional[int],
 ) -> SyncStats:
-    mailbox_dir = config.output_dir / mailbox_dir_name(mailbox)
+    mailbox_path = mailbox_relative_path(mailbox)
+    mailbox_dir = config.output_dir / mailbox_path
     stats = SyncStats()
 
     uids = list_target_uids(client, mailbox, limit)
     print(f"Found {len(uids)} UID(s) in {mailbox} for this run.")
 
-    progress = tqdm(uids, desc=mailbox_dir_name(mailbox), unit="mail")
+    progress = tqdm(uids, desc=str(mailbox_path), unit="mail")
     for uid in progress:
         target = mailbox_dir / f"{uid}.eml"
         if target.exists():

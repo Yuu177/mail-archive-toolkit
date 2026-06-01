@@ -57,7 +57,7 @@ def main() -> int:
     print("Starting HTML to text conversion")
     print(f"  input: {args.input}")
     print(f"  output: {args.output}")
-    return convert_mail_tree(args.input, args.output, "*.html", convert_file)
+    return convert_mail_tree(args.input, args.output, "*.html", convert_file, skip_assets=True)
 
 
 if __name__ == "__main__":
