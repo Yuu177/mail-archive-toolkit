@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
@@ -45,6 +46,15 @@ class SyncStats:
     def exit_code(self) -> int:
         return 1 if self.failed else 0
 
+    def progress_postfix(self) -> OrderedDict[str, int]:
+        return OrderedDict(
+            [
+                ("downloaded", self.downloaded),
+                ("skipped", self.skipped),
+                ("failed", self.failed),
+            ]
+        )
+
 
 def load_config(path: Path) -> Config:
     if not path.exists():
@@ -65,11 +75,16 @@ def load_config(path: Path) -> Config:
     if not mailboxes:
         raise SystemExit("Config value 'mailboxes' must contain at least one mailbox name.")
 
+    try:
+        imap_port = int(raw.get("imap_port", 993))
+    except (TypeError, ValueError) as exc:
+        raise SystemExit("Config value 'imap_port' must be an integer.") from exc
+
     config = Config(
         email=str(raw.get("email", "")).strip(),
         password=str(raw.get("password", "")),
         imap_host=str(raw.get("imap_host", "imap.exmail.qq.com")).strip(),
-        imap_port=int(raw.get("imap_port", 993)),
+        imap_port=imap_port,
         mailboxes=mailboxes,
         output_dir=Path(str(raw.get("output_dir", "mail_archive/raw"))),
     )
@@ -171,11 +186,7 @@ def sync_mailbox(
         target = mailbox_dir / f"{uid}.eml"
         if target.exists():
             stats.skipped += 1
-            progress.set_postfix(
-                downloaded=stats.downloaded,
-                skipped=stats.skipped,
-                failed=stats.failed,
-            )
+            progress.set_postfix(stats.progress_postfix(), refresh=False)
             continue
 
         try:
@@ -185,11 +196,7 @@ def sync_mailbox(
         except Exception as exc:
             stats.failed += 1
             tqdm.write(f"failed {mailbox} {uid}: {exc}", file=sys.stderr)
-        progress.set_postfix(
-            downloaded=stats.downloaded,
-            skipped=stats.skipped,
-            failed=stats.failed,
-        )
+        progress.set_postfix(stats.progress_postfix(), refresh=False)
 
     return stats
 

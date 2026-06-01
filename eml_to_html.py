@@ -10,6 +10,7 @@ import html
 import io
 import logging
 import mimetypes
+import os
 import re
 import shutil
 from pathlib import Path
@@ -17,7 +18,7 @@ from typing import Any
 
 import mailparser
 
-from archive_utils import convert_mail_tree, unique_child_path
+from archive_utils import ASSET_ROOT_NAME, ConversionContext, convert_mail_tree, unique_child_path
 
 
 logging.getLogger("mailparser.mailparser").setLevel(logging.ERROR)
@@ -88,10 +89,10 @@ def attachment_filename(attachment: dict[str, Any], index: int) -> str:
     return f"part-{index}{extension}"
 
 
-def extract_assets(mail: Any, uid: str, output_dir: Path) -> tuple[dict[str, str], list[str]]:
+def extract_assets(mail: Any, uid: str, context: ConversionContext) -> tuple[dict[str, str], list[str]]:
     cid_to_path: dict[str, str] = {}
     attachment_links: list[str] = []
-    asset_root = output_dir / "assets" / uid
+    asset_root = context.output_root / ASSET_ROOT_NAME / context.relative_dir / uid
     inline_dir = asset_root / "inline"
     attachment_dir = asset_root / "attachments"
     used_targets: set[Path] = set()
@@ -111,7 +112,7 @@ def extract_assets(mail: Any, uid: str, output_dir: Path) -> tuple[dict[str, str
 
         target.write_bytes(decode_attachment_payload(attachment))
 
-        relative = target.relative_to(output_dir).as_posix()
+        relative = Path(os.path.relpath(target, context.output_dir)).as_posix()
         if content_id:
             cid_to_path[content_id] = relative
         if not is_inline or content_type:
@@ -213,11 +214,12 @@ def render_html(mail: Any, source: Path, cid_to_path: dict[str, str], attachment
 """
 
 
-def convert_file(source: Path, output_dir: Path, force: bool) -> bool:
+def convert_file(source: Path, context: ConversionContext) -> bool:
+    output_dir = context.output_dir
     target = output_dir / f"{source.stem}.html"
-    asset_root = output_dir / "assets" / source.stem
+    asset_root = context.output_root / ASSET_ROOT_NAME / context.relative_dir / source.stem
 
-    if target.exists() and not force:
+    if target.exists() and not context.force:
         return False
 
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
@@ -226,7 +228,7 @@ def convert_file(source: Path, output_dir: Path, force: bool) -> bool:
     output_dir.mkdir(parents=True, exist_ok=True)
     if asset_root.exists():
         shutil.rmtree(asset_root)
-    cid_to_path, attachment_links = extract_assets(mail, source.stem, output_dir)
+    cid_to_path, attachment_links = extract_assets(mail, source.stem, context)
     target.write_text(render_html(mail, source, cid_to_path, attachment_links), encoding="utf-8")
     return True
 

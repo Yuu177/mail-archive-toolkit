@@ -9,7 +9,7 @@ from pathlib import Path
 
 import html2text
 
-from archive_utils import convert_mail_tree
+from archive_utils import ConversionContext, convert_mail_tree
 
 
 def normalize_text(content: str) -> str:
@@ -28,9 +28,10 @@ def html_to_text(content: str) -> str:
     return normalize_text(converter.handle(content))
 
 
-def convert_file(source: Path, output_dir: Path, force: bool) -> bool:
+def convert_file(source: Path, context: ConversionContext) -> bool:
+    output_dir = context.output_dir
     target = output_dir / f"{source.stem}.txt"
-    if target.exists() and not force:
+    if target.exists() and not context.force:
         return False
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -71,7 +72,7 @@ def main() -> int:
         args.output,
         "*.html",
         convert_file,
-        skip_assets=True,
+        skip_generated_assets=True,
         force=args.force,
     )
 

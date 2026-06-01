@@ -10,6 +10,20 @@ from tqdm import tqdm
 
 
 SortKey = Union[Tuple[int, int], Tuple[int, str]]
+ASSET_ROOT_NAME = ".mail-archive-assets"
+
+
+@dataclass(frozen=True)
+class ConversionContext:
+    input_root: Path
+    output_root: Path
+    input_dir: Path
+    output_dir: Path
+    relative_dir: Path
+    force: bool
+
+
+ConvertFile = Callable[[Path, ConversionContext], bool]
 
 
 @dataclass
@@ -47,41 +61,33 @@ def mailbox_relative_path(name: str) -> Path:
         raise ValueError(f"Mailbox name must be relative: {name!r}")
 
     parts = name.split("/")
-    if not parts or any(part in {"", ".", ".."} for part in parts):
+    unsafe = {"", ".", "..", ASSET_ROOT_NAME}
+    if not parts or any(part in unsafe for part in parts):
         raise ValueError(f"Mailbox name contains an unsafe path segment: {name!r}")
 
     return Path(*parts)
-
-
-def subdirs(root: Path) -> list[Path]:
-    return sorted([path for path in root.iterdir() if path.is_dir()], key=lambda path: path.name)
 
 
 def files_by_name(input_dir: Path, pattern: str) -> list[Path]:
     return sorted(input_dir.glob(pattern), key=numeric_name_key)
 
 
-def mailbox_dirs(root: Path, pattern: str, skip_assets: bool = False) -> list[Path]:
+def mailbox_dirs(root: Path, pattern: str, skip_generated_assets: bool = False) -> list[Path]:
     directories: list[Path] = []
+    seen: set[Path] = set()
     for path in sorted(root.rglob(pattern), key=lambda path: path.relative_to(root).as_posix()):
-        if skip_assets and is_generated_asset(path, root, pattern):
+        if skip_generated_assets and is_generated_asset_file(path, root):
             continue
         parent = path.parent
-        if parent not in directories:
+        if parent not in seen:
+            seen.add(parent)
             directories.append(parent)
     return directories
 
 
-def is_generated_asset(path: Path, root: Path, pattern: str) -> bool:
+def is_generated_asset_file(path: Path, root: Path) -> bool:
     relative_parts = path.relative_to(root).parts
-    for index, part in enumerate(relative_parts):
-        if part != "assets" or index == 0:
-            continue
-        asset_root = root.joinpath(*relative_parts[: index + 1])
-        mailbox_dir = asset_root.parent
-        if any(child.is_file() for child in mailbox_dir.glob(pattern)):
-            return True
-    return False
+    return bool(relative_parts and relative_parts[0] == ASSET_ROOT_NAME)
 
 
 def unique_child_path(directory: Path, filename: str, reserved: Optional[Set[Path]] = None) -> Path:
@@ -102,11 +108,10 @@ def unique_child_path(directory: Path, filename: str, reserved: Optional[Set[Pat
 
 def convert_mailbox_dir(
     input_dir: Path,
-    output_dir: Path,
     pattern: str,
-    convert_file: Callable[[Path, Path, bool], bool],
+    convert_file: ConvertFile,
     display_name: str,
-    force: bool = False,
+    context: ConversionContext,
 ) -> ConversionStats:
     stats = ConversionStats()
     files = files_by_name(input_dir, pattern)
@@ -115,14 +120,14 @@ def convert_mailbox_dir(
     progress = tqdm(files, desc=display_name, unit="mail")
     for source in progress:
         try:
-            if convert_file(source, output_dir, force):
+            if convert_file(source, context):
                 stats.converted += 1
             else:
                 stats.skipped += 1
         except Exception as exc:
             stats.failed += 1
             tqdm.write(f"failed {display_name}/{source.name}: {exc}", file=sys.stderr)
-        progress.set_postfix(stats.progress_postfix())
+        progress.set_postfix(stats.progress_postfix(), refresh=False)
 
     return stats
 
@@ -131,24 +136,35 @@ def convert_mail_tree(
     input_root: Path,
     output_root: Path,
     pattern: str,
-    convert_file: Callable[[Path, Path, bool], bool],
-    skip_assets: bool = False,
+    convert_file: ConvertFile,
+    skip_generated_assets: bool = False,
     force: bool = False,
 ) -> int:
     if not input_root.is_dir():
         raise SystemExit(f"Input root directory not found: {input_root}")
 
     totals = ConversionStats()
-    for input_dir in mailbox_dirs(input_root, pattern, skip_assets=skip_assets):
+    for input_dir in mailbox_dirs(
+        input_root,
+        pattern,
+        skip_generated_assets=skip_generated_assets,
+    ):
         relative_dir = input_dir.relative_to(input_root)
         output_dir = output_root / relative_dir
+        context = ConversionContext(
+            input_root=input_root,
+            output_root=output_root,
+            input_dir=input_dir,
+            output_dir=output_dir,
+            relative_dir=relative_dir,
+            force=force,
+        )
         stats = convert_mailbox_dir(
             input_dir,
-            output_dir,
             pattern,
             convert_file,
             relative_dir.as_posix(),
-            force=force,
+            context,
         )
         totals.add(stats)
 

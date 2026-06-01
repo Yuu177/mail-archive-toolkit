@@ -83,7 +83,7 @@ mail_archive/raw/其他文件夹/gitlab/
 
 ## 转换成 HTML
 
-把归档好的 `.eml` 转成 `.html`，尽量保留邮件原始 HTML 内容。内联图片和附件会保存到 `assets/` 目录。
+把归档好的 `.eml` 转成 `.html`，尽量保留邮件原始 HTML 内容。内联图片和附件会保存到 `mail_archive/html/.mail-archive-assets/`。转换 TXT 时不会读取这个资源目录。
 
 ```bash
 python3 eml_to_html.py --input mail_archive/raw --output mail_archive/html
