@@ -101,6 +101,11 @@ mail_archive/html/其他文件夹/gitlab/
 ```
 
 脚本会递归读取 input 目录下所有邮箱子目录，并保留相对目录结构。
+如果目标 `.html` 已存在，默认会跳过；需要重新生成时加 `--force`：
+
+```bash
+python3 eml_to_html.py --input mail_archive/raw --output mail_archive/html --force
+```
 
 ## 转换成 TXT
 
@@ -109,6 +114,8 @@ mail_archive/html/其他文件夹/gitlab/
 ```bash
 python3 html_to_text.py --input mail_archive/html --output mail_archive/text
 ```
+
+如果目标 `.txt` 已存在，默认会跳过；需要重新生成时加 `--force`。
 
 输出目录：
 

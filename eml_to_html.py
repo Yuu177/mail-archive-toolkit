@@ -213,9 +213,12 @@ def render_html(mail: Any, source: Path, cid_to_path: dict[str, str], attachment
 """
 
 
-def convert_file(source: Path, output_dir: Path) -> None:
+def convert_file(source: Path, output_dir: Path, force: bool) -> bool:
     target = output_dir / f"{source.stem}.html"
     asset_root = output_dir / "assets" / source.stem
+
+    if target.exists() and not force:
+        return False
 
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
         mail = mailparser.parse_from_file(str(source))
@@ -225,6 +228,7 @@ def convert_file(source: Path, output_dir: Path) -> None:
         shutil.rmtree(asset_root)
     cid_to_path, attachment_links = extract_assets(mail, source.stem, output_dir)
     target.write_text(render_html(mail, source, cid_to_path, attachment_links), encoding="utf-8")
+    return True
 
 
 def parse_args() -> argparse.Namespace:
@@ -241,6 +245,11 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Root directory for generated HTML mailbox subdirectories.",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing HTML files and regenerate assets.",
+    )
     return parser.parse_args()
 
 
@@ -249,7 +258,8 @@ def main() -> int:
     print("Starting EML to HTML conversion")
     print(f"  input: {args.input}")
     print(f"  output: {args.output}")
-    return convert_mail_tree(args.input, args.output, "*.eml", convert_file)
+    print(f"  force: {args.force}")
+    return convert_mail_tree(args.input, args.output, "*.eml", convert_file, force=args.force)
 
 
 if __name__ == "__main__":

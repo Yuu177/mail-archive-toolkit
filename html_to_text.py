@@ -28,11 +28,14 @@ def html_to_text(content: str) -> str:
     return normalize_text(converter.handle(content))
 
 
-def convert_file(source: Path, output_dir: Path) -> None:
+def convert_file(source: Path, output_dir: Path, force: bool) -> bool:
     target = output_dir / f"{source.stem}.txt"
+    if target.exists() and not force:
+        return False
 
     output_dir.mkdir(parents=True, exist_ok=True)
     target.write_text(html_to_text(source.read_text(encoding="utf-8", errors="replace")), encoding="utf-8")
+    return True
 
 
 def parse_args() -> argparse.Namespace:
@@ -49,6 +52,11 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Root directory for generated text mailbox subdirectories.",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing text files.",
+    )
     return parser.parse_args()
 
 
@@ -57,7 +65,15 @@ def main() -> int:
     print("Starting HTML to text conversion")
     print(f"  input: {args.input}")
     print(f"  output: {args.output}")
-    return convert_mail_tree(args.input, args.output, "*.html", convert_file, skip_assets=True)
+    print(f"  force: {args.force}")
+    return convert_mail_tree(
+        args.input,
+        args.output,
+        "*.html",
+        convert_file,
+        skip_assets=True,
+        force=args.force,
+    )
 
 
 if __name__ == "__main__":

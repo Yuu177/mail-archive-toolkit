@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional, Set, Tuple, Union
@@ -14,14 +15,25 @@ SortKey = Union[Tuple[int, int], Tuple[int, str]]
 @dataclass
 class ConversionStats:
     converted: int = 0
+    skipped: int = 0
     failed: int = 0
 
     def add(self, other: "ConversionStats") -> None:
         self.converted += other.converted
+        self.skipped += other.skipped
         self.failed += other.failed
 
     def exit_code(self) -> int:
         return 1 if self.failed else 0
+
+    def progress_postfix(self) -> OrderedDict[str, int]:
+        return OrderedDict(
+            [
+                ("converted", self.converted),
+                ("skipped", self.skipped),
+                ("failed", self.failed),
+            ]
+        )
 
 
 def numeric_name_key(path: Path) -> SortKey:
@@ -92,8 +104,9 @@ def convert_mailbox_dir(
     input_dir: Path,
     output_dir: Path,
     pattern: str,
-    convert_file: Callable[[Path, Path], None],
+    convert_file: Callable[[Path, Path, bool], bool],
     display_name: str,
+    force: bool = False,
 ) -> ConversionStats:
     stats = ConversionStats()
     files = files_by_name(input_dir, pattern)
@@ -102,12 +115,14 @@ def convert_mailbox_dir(
     progress = tqdm(files, desc=display_name, unit="mail")
     for source in progress:
         try:
-            convert_file(source, output_dir)
-            stats.converted += 1
+            if convert_file(source, output_dir, force):
+                stats.converted += 1
+            else:
+                stats.skipped += 1
         except Exception as exc:
             stats.failed += 1
             tqdm.write(f"failed {display_name}/{source.name}: {exc}", file=sys.stderr)
-        progress.set_postfix(converted=stats.converted, failed=stats.failed)
+        progress.set_postfix(stats.progress_postfix())
 
     return stats
 
@@ -116,8 +131,9 @@ def convert_mail_tree(
     input_root: Path,
     output_root: Path,
     pattern: str,
-    convert_file: Callable[[Path, Path], None],
+    convert_file: Callable[[Path, Path, bool], bool],
     skip_assets: bool = False,
+    force: bool = False,
 ) -> int:
     if not input_root.is_dir():
         raise SystemExit(f"Input root directory not found: {input_root}")
@@ -126,8 +142,18 @@ def convert_mail_tree(
     for input_dir in mailbox_dirs(input_root, pattern, skip_assets=skip_assets):
         relative_dir = input_dir.relative_to(input_root)
         output_dir = output_root / relative_dir
-        stats = convert_mailbox_dir(input_dir, output_dir, pattern, convert_file, relative_dir.as_posix())
+        stats = convert_mailbox_dir(
+            input_dir,
+            output_dir,
+            pattern,
+            convert_file,
+            relative_dir.as_posix(),
+            force=force,
+        )
         totals.add(stats)
 
-    tqdm.write(f"Done. converted={totals.converted}, failed={totals.failed}, output={output_root}")
+    tqdm.write(
+        f"Done. converted={totals.converted}, skipped={totals.skipped}, "
+        f"failed={totals.failed}, output={output_root}"
+    )
     return totals.exit_code()
